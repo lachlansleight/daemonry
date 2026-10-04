@@ -1,0 +1,80 @@
+@import 'tailwindcss';
+
+/*
+  Every size, spacing and radius in this UI is an explicit pixel value, e.g. text-[13px],
+  pl-[50px], rounded-[6px]. The default scales are removed so named utilities like
+  text-lg or p-4 do not exist. Colours come from the small palette below.
+*/
+@theme {
+  --spacing: initial;
+  --text-*: initial;
+  --radius-*: initial;
+  --leading-*: initial;
+  --tracking-*: initial;
+  --color-*: initial;
+
+  --color-surface-0: #0e0e10;
+  --color-surface-1: #141416;
+  --color-surface-2: #1b1b1e;
+  --color-surface-3: #232327;
+  --color-line: #27272b;
+  --color-line-strong: #38383e;
+  --color-ink-0: #f4f4f5;
+  --color-ink-1: #a1a1aa;
+  --color-ink-2: #6b6b73;
+  --color-accent: #6ea8ff;
+  --color-ok: #3ddc84;
+  --color-warn: #f5b942;
+  --color-bad: #ff5a5a;
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--color-surface-0);
+  color: var(--color-ink-0);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  overflow: hidden;
+}
+
+input,
+textarea,
+pre,
+code {
+  user-select: text;
+}
+
+.drag {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

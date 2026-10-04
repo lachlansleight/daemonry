@@ -1,0 +1,28 @@
+appId: app.daemonry
+productName: daemonry
+directories:
+  buildResources: build
+  output: release
+files:
+  - out/**
+  - resources/**
+  - '!**/.DS_Store'
+asarUnpack:
+  - resources/**
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+    - zip
+  extendInfo:
+    LSUIElement: true
+  hardenedRuntime: false
+  gatekeeperAssess: false
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+npmRebuild: false
