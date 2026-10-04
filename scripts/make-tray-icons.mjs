@@ -75,7 +75,7 @@ const shapes = {
   // Ring with a filled centre: something running.
   running: (x, y) => {
     const d = dist(x, y, 8, 8)
-    return (d <= 7 && d >= 5) || d <= 3
+    return (d <= 7 && d >= 5) || d <= 2.5
   },
   // Filled disc with an exclamation mark cut out: a crash.
   alert: (x, y) => {
