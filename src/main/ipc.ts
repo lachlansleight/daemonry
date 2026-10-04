@@ -1,7 +1,8 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { promises as fs } from 'node:fs'
 import { IPC } from '@shared/ipc'
-import type { AppId } from '@shared/types'
+import type { AppId, LogLine, Paths } from '@shared/types'
+import { deleteLogFiles, type LogStore } from './appLogs'
 import { normaliseApp } from './config'
 import { log } from './log'
 import type { ShellEnv } from './shellEnv'
@@ -9,7 +10,18 @@ import type { Store } from './store'
 import type { Supervisor } from './supervisor'
 import { getWindow } from './window'
 
-export function registerIpc(store: Store, supervisor: Supervisor, shellEnv: ShellEnv): void {
+export interface IpcDeps {
+  store: Store
+  supervisor: Supervisor
+  shellEnv: ShellEnv
+  logStore: LogStore
+  paths: Paths
+}
+
+/** Log lines are coalesced for this long before being pushed to the renderer. */
+const LOG_FLUSH_MS = 50
+
+export function registerIpc({ store, supervisor, shellEnv, logStore, paths }: IpcDeps): void {
   ipcMain.handle(IPC.getSnapshot, () => store.snapshot())
 
   ipcMain.handle(IPC.saveApp, (_event, raw: unknown) => {
@@ -21,6 +33,8 @@ export function registerIpc(store: Store, supervisor: Supervisor, shellEnv: Shel
   ipcMain.handle(IPC.deleteApp, async (_event, id: AppId) => {
     await supervisor.stop(id)
     store.deleteApp(id)
+    logStore.forget(id)
+    deleteLogFiles(paths.logsDir, id)
   })
 
   ipcMain.handle(IPC.setLaunchAtLogin, (_event, value: boolean) => {
@@ -61,8 +75,30 @@ export function registerIpc(store: Store, supervisor: Supervisor, shellEnv: Shel
     else shell.showItemInFolder(target)
   })
 
+  ipcMain.handle(IPC.getLogTail, (_event, id: AppId) => logStore.tail(id))
+  ipcMain.handle(IPC.clearLogs, (_event, id: AppId) => logStore.clear(id))
+
   store.on('change', (snapshot) => {
     for (const win of BrowserWindow.getAllWindows()) win.webContents.send(IPC.snapshot, snapshot)
+  })
+
+  // Batch log lines per app and only push to windows that can show them. A window
+  // that was hidden refetches the tail when it becomes visible again.
+  const pending = new Map<AppId, LogLine[]>()
+  let flushTimer: NodeJS.Timeout | null = null
+  const flush = (): void => {
+    flushTimer = null
+    const targets = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed() && w.isVisible())
+    if (targets.length > 0) {
+      for (const [id, lines] of pending) for (const win of targets) win.webContents.send(IPC.logLines, id, lines)
+    }
+    pending.clear()
+  }
+  logStore.on('lines', (id: AppId, lines: LogLine[]) => {
+    const queue = pending.get(id)
+    if (queue) queue.push(...lines)
+    else pending.set(id, [...lines])
+    if (!flushTimer) flushTimer = setTimeout(flush, LOG_FLUSH_MS)
   })
 }
 

@@ -252,11 +252,19 @@ Main panel pages:
 
 ## Logging
 
-Each app's stdout and stderr are appended to `<logs>/<appId>.log`, rotated at 5 MB
-keeping three files. The last 2000 lines are also kept in memory and streamed to the
-renderer for the live tail. Daemonry's own log is `<logs>/daemonry.log`. On macOS
-`<logs>` is `~/Library/Logs/daemonry`; on Windows `%APPDATA%\daemonry\logs`.
-"View Logs" in the tray opens the GUI straight to that app's log section.
+Each app's stdout and stderr are appended raw to `<logs>/<appId>.log`, rotated at 5 MB
+keeping three files (`<id>.log`, `<id>.1.log`, `<id>.2.log`). Daemonry writes a marker
+line on start and on exit. The last 2000 lines are also kept in memory as cleaned lines:
+ANSI escapes stripped, a line redrawn with `\r` reduced to its final state, each tagged
+stdout, stderr or daemonry. On startup the in-memory tail is primed from the last 64 KB of
+the file so history survives a restart. Lines are batched for 50 ms and pushed only to
+visible windows; a window refetches the tail when it becomes visible again.
+
+The GUI's log view follows the end until the user scrolls up, then offers "Jump to
+latest". Clear empties the view only; the file is kept. Deleting an app deletes its log
+files. Daemonry's own log is `<logs>/daemonry.log`. On macOS `<logs>` is
+`~/Library/Logs/daemonry`; on Windows `%APPDATA%\daemonry\logs`. "View Logs" in the tray
+opens the GUI straight to that app's log section.
 
 ## Platform notes
 

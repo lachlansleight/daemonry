@@ -1,6 +1,6 @@
 // Renderer <-> main contract. The preload exposes DaemonryApi as window.daemonry.
 
-import type { AppConfig, AppId, ShellEnvSummary, Snapshot } from './types'
+import type { AppConfig, AppId, LogLine, ShellEnvSummary, Snapshot } from './types'
 
 export type Route =
   | { page: 'home' }
@@ -31,6 +31,10 @@ export interface DaemonryApi {
 
   chooseFolder(initial?: string): Promise<string | null>
   revealInFolder(path: string): Promise<void>
+
+  getLogTail(id: AppId): Promise<LogLine[]>
+  onLogLines(cb: (id: AppId, lines: LogLine[]) => void): () => void
+  clearLogs(id: AppId): Promise<void>
 }
 
 export const IPC = {
@@ -48,4 +52,7 @@ export const IPC = {
   sendCommand: 'app:sendCommand',
   chooseFolder: 'dialog:chooseFolder',
   revealInFolder: 'shell:revealInFolder',
+  getLogTail: 'logs:tail',
+  logLines: 'logs:lines',
+  clearLogs: 'logs:clear',
 } as const

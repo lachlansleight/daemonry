@@ -5,12 +5,12 @@ the full design, data model, protocol and milestones.
 
 ## Status
 
-Milestones 1 and 2 are done. Apps can be configured, started, stopped and restarted from
+Milestones 1 to 3 are done. Apps can be configured, started, stopped and restarted from
 the tray or the GUI; they run in their own process group with the login shell's
 environment, autostart with daemonry, are killed as a tree after the grace period, and
-are all stopped on quit. Each app appends to a log file. Not yet: log rotation and the
-live log view (milestone 3), the socket protocol and commands (milestone 4), packaging
-and login item (milestone 5), Windows testing (milestone 6).
+are all stopped on quit. Output goes to rotated log files and a live log view in the
+GUI. Not yet: the socket protocol and commands (milestone 4), packaging and login item
+(milestone 5), Windows testing (milestone 6).
 
 ## Develop
 
@@ -28,7 +28,8 @@ renderer against an in-memory mock with three sample apps, useful for UI work wi
 
 Dev switches: `DAEMONRY_USER_DATA=<dir>` runs against a separate profile,
 `DAEMONRY_INSPECT_PORT=9333` opens the Node inspector on the main process so
-`node scripts/dev-eval.mjs "<expr>"` can drive it, `DAEMONRY_KEEP_DOCK=1` keeps the dock icon.
+`node scripts/dev-eval.mjs "<expr>"` can drive it, `DAEMONRY_KEEP_DOCK=1` keeps the dock icon,
+`DAEMONRY_LOG_MAX_BYTES=20000` rotates app logs early for testing.
 
 Other scripts:
 

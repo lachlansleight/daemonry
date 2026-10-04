@@ -4,11 +4,10 @@
 
 import { spawn, type ChildProcess } from 'node:child_process'
 import { promises as fs } from 'node:fs'
-import { join } from 'node:path'
 import type { ActionResult } from '@shared/ipc'
 import { ENV } from '@shared/protocol'
 import type { AppId } from '@shared/types'
-import { AppLogWriter } from './appLogs'
+import { AppLogWriter, type LogStore } from './appLogs'
 import { log } from './log'
 import type { ShellEnv } from './shellEnv'
 import type { Store } from './store'
@@ -37,6 +36,7 @@ export class Supervisor {
     private readonly store: Store,
     private readonly shellEnv: ShellEnv,
     private readonly logsDir: string,
+    private readonly logStore: LogStore,
   ) {}
 
   hasRunning(): boolean {
@@ -57,7 +57,7 @@ export class Supervisor {
       [ENV.appId]: app.id,
       [ENV.appName]: app.name,
     }
-    const logWriter = new AppLogWriter(join(this.logsDir, `${app.id}.log`))
+    const logWriter = new AppLogWriter(this.logsDir, app.id, (kind, text) => this.logStore.append(app.id, kind, text))
     logWriter.marker(`start: ${app.command}  (cwd ${app.cwd})`)
 
     const win = process.platform === 'win32'
@@ -99,8 +99,8 @@ export class Supervisor {
     }
     this.running.set(id, entry)
 
-    child.stdout?.on('data', (chunk: Buffer) => logWriter.write(chunk))
-    child.stderr?.on('data', (chunk: Buffer) => logWriter.write(chunk))
+    child.stdout?.on('data', (chunk: Buffer) => logWriter.write('out', chunk))
+    child.stderr?.on('data', (chunk: Buffer) => logWriter.write('err', chunk))
     child.stdin?.on('error', () => undefined)
     child.on('error', (err) => log.warn(`${app.name}: child error`, err.message))
     // 'close' rather than 'exit': it waits for every holder of the pipes, so a
@@ -202,6 +202,7 @@ export class Supervisor {
 
   private failedToStart(id: AppId, message: string): ActionResult {
     log.warn(`${this.store.getApp(id)?.name ?? id}: failed to start: ${message}`)
+    this.logStore.append(id, 'sys', `failed to start: ${message}`)
     this.store.updateRuntime(id, { state: 'crashed', pid: null, startedAt: null, lastError: message })
     return fail(message)
   }

@@ -73,6 +73,19 @@ export const EMPTY_SHELL_ENV: ShellEnvSummary = {
   varCount: 0,
 }
 
+export type LogKind = 'out' | 'err' | 'sys'
+
+/** One line of an app's output, as kept in memory and streamed to the GUI. */
+export interface LogLine {
+  /** Monotonic per app for the daemonry session; a stable React key. */
+  seq: number
+  t: number
+  kind: LogKind
+  text: string
+}
+
+export const LOG_TAIL_LINES = 2000
+
 export interface Paths {
   configFile: string
   logsDir: string

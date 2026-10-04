@@ -1,7 +1,7 @@
 // In-memory stand-in for the main process, used only when previewing in a browser.
 
 import type { ActionResult, DaemonryApi, Route } from '@shared/ipc'
-import { emptyRuntime, newAppConfig, type AppId, type AppRuntime, type Snapshot } from '@shared/types'
+import { emptyRuntime, newAppConfig, type AppId, type AppRuntime, type LogLine, type Snapshot } from '@shared/types'
 
 export function createMockApi(): DaemonryApi {
   const apps = [
@@ -60,6 +60,27 @@ export function createMockApi(): DaemonryApi {
       varCount: 142,
     },
   }
+
+  const logs = new Map<AppId, LogLine[]>()
+  const logListeners = new Set<(id: AppId, lines: LogLine[]) => void>()
+  let seq = 0
+  const pushLog = (id: AppId, kind: LogLine['kind'], text: string, emit = true): void => {
+    const line: LogLine = { seq: ++seq, t: Date.now(), kind, text }
+    logs.set(id, [...(logs.get(id) ?? []), line].slice(-2000))
+    if (emit) logListeners.forEach((cb) => cb(id, [line]))
+  }
+  pushLog('botchi01', 'sys', 'start: npm run dev  (cwd /Users/lachlan/Development/LiquidCity/Studio2026/botchi/botchi-server)', false)
+  pushLog('botchi01', 'out', '> botchi-server@0.1.0 dev', false)
+  pushLog('botchi01', 'out', '> nodemon --watch src --ext ts,json --exec "npm run bundle && npm run start"', false)
+  pushLog('botchi01', 'err', '[nodemon] 3.1.4', false)
+  pushLog('botchi01', 'err', '[nodemon] starting `npm run bundle && npm run start`', false)
+  pushLog('botchi01', 'out', 'Server listening on http://localhost:4100', false)
+  pushLog('bridge01', 'sys', 'start: npm start  (cwd /Users/lachlan/Development/Lachlan/claude-code-wrapper/plugin)', false)
+  pushLog('bridge01', 'err', '[bridge:fatal] BRIDGE_TOKEN is not set.', false)
+  pushLog('bridge01', 'sys', 'crashed: code 1', false)
+  setInterval(() => {
+    if (snapshot.runtime['botchi01']?.state === 'running') pushLog('botchi01', 'out', `GET /api/state 200 ${Math.round(Math.random() * 40)}ms`)
+  }, 1500)
 
   const listeners = new Set<(s: Snapshot) => void>()
   const navListeners = new Set<(r: Route) => void>()
@@ -120,5 +141,11 @@ export function createMockApi(): DaemonryApi {
 
     chooseFolder: async () => '/Users/lachlan/Development/example-app',
     revealInFolder: async () => undefined,
+
+    getLogTail: async (id) => logs.get(id) ?? [],
+    onLogLines: (cb) => (logListeners.add(cb), () => logListeners.delete(cb)),
+    clearLogs: async (id) => {
+      logs.set(id, [])
+    },
   }
 }

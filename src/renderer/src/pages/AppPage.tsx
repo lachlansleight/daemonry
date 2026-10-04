@@ -3,6 +3,7 @@ import { STATE_LABEL, describeRuntime, formatUptime } from '@shared/format'
 import { isActive, type AppId } from '@shared/types'
 import { api } from '../api'
 import { AppForm } from '../components/AppForm'
+import { LogView } from '../components/LogView'
 import { StatusDot } from '../components/StatusDot'
 import { Button, Page, SectionLabel } from '../components/ui'
 import { useActions, useApp, useDaemonry, useNow } from '../store'
@@ -22,6 +23,8 @@ export function AppPage({ id, section }: { id: AppId; section?: 'status' | 'logs
   const actions = useActions()
   const now = useNow(isActive(runtime.state))
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [lineCount, setLineCount] = useState(0)
+  const [logEpoch, setLogEpoch] = useState(0)
   const logsRef = useRef<HTMLDivElement>(null)
   const configRef = useRef<HTMLDivElement>(null)
 
@@ -37,6 +40,7 @@ export function AppPage({ id, section }: { id: AppId; section?: 'status' | 'logs
   const running = runtime.state === 'running'
   const platform = snapshot?.platform ?? 'darwin'
   const revealLabel = platform === 'darwin' ? 'Open in Finder' : platform === 'win32' ? 'Show in Explorer' : 'Open folder'
+  const logFile = snapshot ? `${snapshot.paths.logsDir}${platform === 'win32' ? '\\' : '/'}${id}.log` : ''
 
   return (
     <Page
@@ -95,8 +99,24 @@ export function AppPage({ id, section }: { id: AppId; section?: 'status' | 'logs
       </section>
 
       <section className="mb-[28px] scroll-mt-[24px]" ref={logsRef}>
-        <SectionLabel>Logs</SectionLabel>
-        <div className="h-[280px] rounded-[8px] border border-line bg-surface-1 px-[14px] py-[10px] overflow-auto font-mono text-[12px] leading-[18px] text-ink-1 whitespace-pre" />
+        <div className="flex items-center justify-between mb-[12px]">
+          <SectionLabel>Logs</SectionLabel>
+          <div className="flex items-center gap-[6px] mb-[12px]">
+            <span className="text-[11px] text-ink-2 mr-[6px]">{lineCount > 0 ? `${lineCount} lines` : ''}</span>
+            <Button
+              variant="ghost"
+              onClick={() => void api.clearLogs(id).then(() => setLogEpoch((e) => e + 1))}
+              disabled={lineCount === 0}
+              title="Clear the view; the file is kept"
+            >
+              Clear
+            </Button>
+            <Button variant="ghost" onClick={() => void api.revealInFolder(logFile)} title={logFile}>
+              Log file
+            </Button>
+          </div>
+        </div>
+        <LogView key={`${id}:${logEpoch}`} id={id} onCount={setLineCount} />
       </section>
 
       <section className="mb-[28px] scroll-mt-[24px]" ref={configRef}>

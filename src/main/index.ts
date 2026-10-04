@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { join } from 'node:path'
 import type { Paths } from '@shared/types'
+import { LogStore, logFileFor } from './appLogs'
 import { loadConfig } from './config'
 import { applyLoginItem, registerIpc } from './ipc'
 import { initLog, log } from './log'
@@ -13,7 +14,8 @@ import { markQuitting, openWindow } from './window'
 // Dev affordances, all opt-in through the environment:
 //   DAEMONRY_USER_DATA    separate profile (config, logs, single-instance lock)
 //   DAEMONRY_INSPECT_PORT open the Node inspector on the main process and expose
-//                         globalThis.__daemonry = { app, store, supervisor } for scripts/dev-eval.mjs
+//                         globalThis.__daemonry = { app, store, supervisor, logStore } for scripts/dev-eval.mjs
+//   DAEMONRY_LOG_MAX_BYTES rotate app logs at this size instead of 5 MB
 //   DAEMONRY_KEEP_DOCK    skip hiding the dock icon
 const userDataOverride = process.env['DAEMONRY_USER_DATA']
 if (userDataOverride) {
@@ -42,13 +44,15 @@ function main(): void {
   const { config, existed } = loadConfig(paths.configFile)
   const store = new Store(config, paths)
   const shellEnv = new ShellEnv()
-  const supervisor = new Supervisor(store, shellEnv, paths.logsDir)
+  const logStore = new LogStore()
+  for (const appConfig of config.apps) logStore.primeFromFile(appConfig.id, logFileFor(paths.logsDir, appConfig.id))
+  const supervisor = new Supervisor(store, shellEnv, paths.logsDir, logStore)
   const tray = new TrayController(store, supervisor, openWindow)
 
-  registerIpc(store, supervisor, shellEnv)
+  registerIpc({ store, supervisor, shellEnv, logStore, paths })
   tray.init()
   if (config.launchAtLogin) applyLoginItem(true)
-  openInspectorIfRequested({ store, supervisor })
+  openInspectorIfRequested({ store, supervisor, logStore })
 
   // First run: no config yet, so show the GUI.
   if (!existed) openWindow({ page: 'home' })

@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { IPC, type DaemonryApi, type Route } from '@shared/ipc'
-import type { AppConfig, AppId, Snapshot } from '@shared/types'
+import type { AppConfig, AppId, LogLine, Snapshot } from '@shared/types'
 
 function subscribe<T>(channel: string, cb: (payload: T) => void): () => void {
   const handler = (_event: IpcRendererEvent, payload: T): void => cb(payload)
@@ -26,6 +26,14 @@ const api: DaemonryApi = {
 
   chooseFolder: (initial) => ipcRenderer.invoke(IPC.chooseFolder, initial),
   revealInFolder: (path) => ipcRenderer.invoke(IPC.revealInFolder, path),
+
+  getLogTail: (id) => ipcRenderer.invoke(IPC.getLogTail, id),
+  onLogLines: (cb) => {
+    const handler = (_event: IpcRendererEvent, id: AppId, lines: LogLine[]): void => cb(id, lines)
+    ipcRenderer.on(IPC.logLines, handler)
+    return () => ipcRenderer.off(IPC.logLines, handler)
+  },
+  clearLogs: (id) => ipcRenderer.invoke(IPC.clearLogs, id),
 }
 
 contextBridge.exposeInMainWorld('daemonry', api)
