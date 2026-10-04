@@ -1,0 +1,12 @@
+{
+  "name": "daemonry-hello-app",
+  "private": true,
+  "type": "module",
+  "description": "Tiny example of an app managed by daemonry",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning index.ts"
+  },
+  "engines": {
+    "node": ">=23.6"
+  }
+}

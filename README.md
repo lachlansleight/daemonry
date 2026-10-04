@@ -5,12 +5,30 @@ the full design, data model, protocol and milestones.
 
 ## Status
 
-Milestones 1 to 3 are done. Apps can be configured, started, stopped and restarted from
+Milestones 1 to 4 are done. Apps can be configured, started, stopped and restarted from
 the tray or the GUI; they run in their own process group with the login shell's
 environment, autostart with daemonry, are killed as a tree after the grace period, and
 are all stopped on quit. Output goes to rotated log files and a live log view in the
-GUI. Not yet: the socket protocol and commands (milestone 4), packaging and login item
-(milestone 5), Windows testing (milestone 6).
+GUI. Apps that include the client declare commands that appear in the tray and GUI,
+report a status line, and get a graceful shutdown message. Not yet: packaging and login
+item (milestone 5), Windows testing (milestone 6).
+
+## Integrating an app
+
+Copy [client/daemonry-client.ts](client/daemonry-client.ts) into your app. It has no
+dependencies and does nothing when the app is not launched by daemonry.
+
+```ts
+import { daemonry } from './daemonry-client.ts'
+
+daemonry.commands([{ id: 'reload', label: 'Reload config' }])
+daemonry.onCommand((id) => { if (id === 'reload') reload() })
+daemonry.onShutdown(() => { tidyUp(); process.exit(0) })  // optional
+daemonry.status('Idle')                                   // optional
+```
+
+[examples/hello-app](examples/hello-app) is a complete tiny example. Add that folder in
+daemonry with the command `npm start` and its commands show up in the menu.
 
 ## Develop
 

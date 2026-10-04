@@ -4,10 +4,12 @@
 
 import { spawn, type ChildProcess } from 'node:child_process'
 import { promises as fs } from 'node:fs'
+import { tmpdir } from 'node:os'
 import type { ActionResult } from '@shared/ipc'
-import { ENV } from '@shared/protocol'
-import type { AppId } from '@shared/types'
+import { ENV, socketPathFor } from '@shared/protocol'
+import type { AppId, CommandDecl } from '@shared/types'
 import { AppLogWriter, type LogStore } from './appLogs'
+import { AppSocketServer } from './appSocket'
 import { log } from './log'
 import type { ShellEnv } from './shellEnv'
 import type { Store } from './store'
@@ -22,6 +24,8 @@ interface RunningApp {
   settleTimer: NodeJS.Timeout | null
   killTimer: NodeJS.Timeout | null
   logWriter: AppLogWriter
+  /** null when the socket could not be opened; the app then runs without the protocol. */
+  socket: AppSocketServer | null
   /** Resolves once the whole tree is gone (all stdio closed) and state is final. */
   finished: Promise<void>
 }
@@ -51,12 +55,28 @@ export class Supervisor {
     const cwd = await fs.stat(app.cwd).catch(() => null)
     if (!cwd?.isDirectory()) return this.failedToStart(id, `folder not found: ${app.cwd || '(empty)'}`)
 
-    const env = {
+    const env: Record<string, string> = {
       ...this.shellEnv.get(),
       ...app.env,
       [ENV.appId]: app.id,
       [ENV.appName]: app.name,
     }
+
+    const socket = new AppSocketServer(socketPathFor(app.id, process.platform, tmpdir()), app, {
+      onHello: (commands, status) => this.onHello(id, commands, status),
+      onCommands: (commands) => this.store.updateRuntime(id, { commands }),
+      onStatus: (text) => this.store.updateRuntime(id, { statusText: text }),
+      onDisconnect: () => this.store.updateRuntime(id, { connected: false }),
+    })
+    let socketOrNull: AppSocketServer | null = socket
+    try {
+      await socket.listen()
+      env[ENV.socket] = socket.path
+    } catch (err) {
+      log.warn(`${app.name}: could not open the app socket, running without the protocol`, err)
+      socketOrNull = null
+    }
+
     const logWriter = new AppLogWriter(this.logsDir, app.id, (kind, text) => this.logStore.append(app.id, kind, text))
     logWriter.marker(`start: ${app.command}  (cwd ${app.cwd})`)
 
@@ -80,6 +100,7 @@ export class Supervisor {
       const message = spawnError?.message ?? 'spawn failed'
       logWriter.marker(`spawn failed: ${message}`)
       logWriter.close()
+      socket.close()
       return this.failedToStart(id, message)
     }
 
@@ -95,6 +116,7 @@ export class Supervisor {
       settleTimer: null,
       killTimer: null,
       logWriter,
+      socket: socketOrNull,
       finished,
     }
     this.running.set(id, entry)
@@ -139,18 +161,26 @@ export class Supervisor {
       entry.stopRequested = true
       this.store.updateRuntime(id, { state: 'stopping' })
       const graceMs = this.store.getApp(id)?.stopGraceMs ?? this.store.getConfig().defaultStopGraceMs
-      log.info(`stopping ${name} (pid ${entry.pid}), grace ${graceMs}ms`)
-      // Milestone 4: send {"type":"shutdown"} over the socket before signalling.
-      if (process.platform === 'win32') {
-        // No SIGTERM on Windows. Until the socket exists there is no graceful path.
-        this.forceKill(entry)
-      } else {
-        signalGroup(entry.pid, 'SIGTERM')
+      const armKill = (): void => {
         entry.killTimer = setTimeout(() => {
           entry.killTimer = null
           log.warn(`${name}: grace period expired, killing the process group`)
           this.forceKill(entry)
         }, graceMs)
+      }
+      if (entry.socket?.send({ type: 'shutdown' })) {
+        // A connected client gets the message instead of a signal, so its handler is
+        // not cut short by SIGTERM's default action. The grace period still applies.
+        log.info(`stopping ${name} (pid ${entry.pid}) via shutdown message, grace ${graceMs}ms`)
+        armKill()
+      } else if (process.platform === 'win32') {
+        // No SIGTERM on Windows; without a connected client there is no graceful path.
+        log.info(`stopping ${name} (pid ${entry.pid}) by killing the tree`)
+        this.forceKill(entry)
+      } else {
+        log.info(`stopping ${name} (pid ${entry.pid}) via SIGTERM, grace ${graceMs}ms`)
+        signalGroup(entry.pid, 'SIGTERM')
+        armKill()
       }
     }
     await entry.finished
@@ -165,9 +195,31 @@ export class Supervisor {
     return this.start(id)
   }
 
-  sendCommand(id: AppId, commandId: string): Promise<ActionResult> {
+  async sendCommand(id: AppId, commandId: string): Promise<ActionResult> {
     const name = this.store.getApp(id)?.name ?? id
-    return Promise.resolve(fail(`cannot send "${commandId}" to ${name}: the app protocol arrives in milestone 4`))
+    const entry = this.running.get(id)
+    if (!entry) return fail(`${name} is not running`)
+    if (!entry.socket?.connected) return fail(`${name} has no daemonry client connected`)
+    if (!entry.socket.send({ type: 'command', id: commandId })) return fail(`${name}: could not send the command`)
+    log.info(`sent command "${commandId}" to ${name}`)
+    return ok()
+  }
+
+  /** The app's client said hello: it is running now, whatever the settle timer thinks. */
+  private onHello(id: AppId, commands: CommandDecl[], status: string | null): void {
+    const entry = this.running.get(id)
+    if (entry?.settleTimer) {
+      clearTimeout(entry.settleTimer)
+      entry.settleTimer = null
+    }
+    const current = this.store.getRuntime(id)
+    this.store.updateRuntime(id, {
+      connected: true,
+      commands,
+      statusText: status,
+      state: current.state === 'launching' ? 'running' : current.state,
+    })
+    log.info(`${this.store.getApp(id)?.name ?? id}: client connected, ${commands.length} command(s)`)
   }
 
   async startAll(): Promise<ActionResult> {
@@ -212,6 +264,7 @@ export class Supervisor {
     if (!entry) return
     if (entry.settleTimer) clearTimeout(entry.settleTimer)
     if (entry.killTimer) clearTimeout(entry.killTimer)
+    entry.socket?.close()
     this.running.delete(id)
 
     const name = this.store.getApp(id)?.name ?? id

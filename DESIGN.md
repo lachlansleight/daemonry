@@ -93,10 +93,12 @@ during that window with a non-zero code it is `crashed`.
 
 **Stop.** In order:
 
-1. Send `{"type":"shutdown"}` over the socket if a client is connected.
-2. POSIX: send SIGTERM to the process group.
-3. Wait `stopGraceMs` (default ten seconds; reachy-idle needs time to settle the robot).
-4. Kill the whole tree: SIGKILL to the process group on POSIX, `taskkill /T /F` on Windows.
+1. If the app's client is connected, send `{"type":"shutdown"}` over the socket and do
+   not signal: a SIGTERM arriving a moment later would cut the handler short, since the
+   default SIGTERM action is immediate termination. Otherwise, on POSIX, send SIGTERM to
+   the process group. On Windows without a client there is no graceful path.
+2. Wait `stopGraceMs` (default ten seconds; reachy-idle needs time to settle the robot).
+3. Kill the whole tree: SIGKILL to the process group on POSIX, `taskkill /T /F` on Windows.
 
 State is `stopping` throughout, then `inactive`. A stop requested by the user is never
 reported as a crash regardless of exit code.
@@ -166,27 +168,33 @@ Messages, daemonry to app:
 { "type": "shutdown" }
 ```
 
-The client reconnects with backoff whenever the connection drops, so apps run under
-`tsx watch` or nodemon keep working across restarts of the inner process. When
-`DAEMONRY_SOCKET` is absent the client is inert and every call is a no-op, so apps
-still run normally from a terminal.
+The client reconnects with backoff (250 ms doubling to 5 s) whenever the connection
+drops, so apps run under `tsx watch` or nodemon keep working across restarts of the inner
+process. If a second connection arrives while one is open, the newest wins. When
+`DAEMONRY_SOCKET` is absent the client is inert and every call is a no-op, so apps still
+run normally from a terminal. Daemonry validates what it receives: command ids and labels
+are trimmed and capped, duplicates dropped, at most 50 commands, status at most 200
+characters, and an oversized or non-JSON line drops the connection or is ignored.
 
-Client API, one file, zero dependencies, Node `net` only:
+Client API, one file, zero dependencies, Node `net` only. It uses erasable TypeScript
+syntax only, so it runs under `node file.ts` (Node 23.6+) as well as tsx, esbuild or tsc:
 
 ```ts
-import { daemonry } from "./daemonry-client";
+import { daemonry } from "./daemonry-client.ts";
 
 daemonry.active;                                   // true when launched by daemonry
 daemonry.commands([{ id: "sleep", label: "Sleep" }, { id: "wake", label: "Wake" }]);
 daemonry.onCommand((id) => { /* if (id === "sleep") ... */ });
 daemonry.onShutdown(() => { /* optional graceful stop */ });
-daemonry.status("Idle");
+daemonry.status("Idle");                           // null clears it
+daemonry.close();                                  // only if the app wants to exit on its own
 ```
 
 If no `onShutdown` handler is registered, a `shutdown` message invokes the process's
 SIGTERM listeners, or exits with code 0 when there are none. This is what gives Windows
 a graceful stop. The protocol is language-neutral; a Python client would be a one-file
-port speaking the same messages.
+port speaking the same messages. `examples/hello-app` is a tiny app using the client,
+with commands that greet, do timed work with status updates, and crash on purpose.
 
 ## Tray menu
 
@@ -310,6 +318,6 @@ no runtime dependencies beyond Electron and Node built-ins.
    log files, because piped stdout has to be drained from day one or the child blocks.
 3. **Logs.** Rotation, in-memory tail, live log view in the GUI, View Logs.
 4. **Protocol.** Socket server per app, `client/daemonry-client.ts`, declared
-   commands in the tray and GUI, status text, shutdown message.
+   commands in the tray and GUI, status text, shutdown message, `examples/hello-app`.
 5. **Packaging.** Login item, electron-builder config, first `.app`, Gatekeeper notes.
 6. **Windows.** Pipes, taskkill, Explorer label, NSIS installer. Test on a Windows machine.

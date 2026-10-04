@@ -1,0 +1,6 @@
+{
+  "name": "daemonry-client",
+  "private": true,
+  "type": "module",
+  "description": "Marks daemonry-client.ts as an ES module when imported from inside this repo; apps that copy the file do not need this."
+}
