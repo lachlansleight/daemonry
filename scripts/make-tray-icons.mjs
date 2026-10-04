@@ -3,6 +3,12 @@
 //   *-light.png     white on transparent, for dark Windows taskbars
 //   alert.png       red, shown while any app is crashed (non-template)
 // Each at 16x16 and 32x32 (@2x). Shapes are supersampled for smooth edges.
+//
+// The glyph is a stylised demon head: round face, two horns, slanted eyes and a wide
+// grin cut out of the silhouette. Idle is the same glyph at half alpha.
+//
+//   node scripts/make-tray-icons.mjs                 write the tray icons
+//   node scripts/make-tray-icons.mjs --preview DIR   also write 128px previews to DIR
 
 import { deflateSync } from 'node:zlib'
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -59,35 +65,77 @@ function encodePng(width, height, rgba) {
 }
 
 // --- Shapes -----------------------------------------------------------------
-// Each shape is a function (x, y) -> boolean in a 16-unit coordinate space.
+// Each shape is a function (x, y) -> boolean in a 16-unit coordinate space, y down.
 
 const dist = (x, y, cx, cy) => Math.hypot(x - cx, y - cy)
 
-// Radii are chosen so the 1x (16px) render lands on whole pixels: a 2px ring from
-// r=5 to r=7 around the pixel corner at (8,8). Thin antialiased strokes look like a
-// smudge on non-Retina menu bars, so nothing here is thinner than 2px.
-const shapes = {
-  // Hollow ring: nothing running.
-  idle: (x, y) => {
-    const d = dist(x, y, 8, 8)
-    return d <= 7 && d >= 5
-  },
-  // Ring with a filled centre: something running.
-  running: (x, y) => {
-    const d = dist(x, y, 8, 8)
-    return (d <= 7 && d >= 5) || d <= 2.5
-  },
-  // Filled disc with an exclamation mark cut out: a crash.
-  alert: (x, y) => {
-    const d = dist(x, y, 8, 8)
-    if (d > 7) return false
-    const bar = x >= 7 && x <= 9 && y >= 3.5 && y <= 9
-    const dot = dist(x, y, 8, 11.5) <= 1.25
-    return !(bar || dot)
-  },
+function inTriangle(px, py, [ax, ay], [bx, by], [cx, cy]) {
+  const d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by)
+  const d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy)
+  const d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay)
+  const neg = d1 < 0 || d2 < 0 || d3 < 0
+  const pos = d1 > 0 || d2 > 0 || d3 > 0
+  return !(neg && pos)
 }
 
-function render(shape, size, [r, g, b]) {
+function inEllipse(px, py, cx, cy, a, b, angleDeg) {
+  const t = (angleDeg * Math.PI) / 180
+  const dx = px - cx
+  const dy = py - cy
+  const u = dx * Math.cos(t) + dy * Math.sin(t)
+  const v = -dx * Math.sin(t) + dy * Math.cos(t)
+  return (u * u) / (a * a) + (v * v) / (b * b) <= 1
+}
+
+// Head circle with two curved, tapered horns growing from its upper sides, then
+// slanted eyes and a wide grin cut out. Each horn is a quadratic Bezier spine
+// (base, control, tip) swept with a width that tapers to the tip.
+const HEAD = { cx: 8, cy: 9.6, r: 5.5 }
+
+const LEFT_HORN = { p0: [4.3, 6.4], pc: [1.6, 4.6], p1: [2.4, 0.9], width: 1.7 }
+const RIGHT_HORN = {
+  p0: [16 - 4.3, 6.4],
+  pc: [16 - 1.6, 4.6],
+  p1: [16 - 2.4, 0.9],
+  width: 1.7,
+}
+
+const SPINE_SAMPLES = 48
+function hornSpine({ p0, pc, p1 }) {
+  const pts = []
+  for (let i = 0; i <= SPINE_SAMPLES; i++) {
+    const t = i / SPINE_SAMPLES
+    const a = (1 - t) * (1 - t)
+    const b = 2 * (1 - t) * t
+    const c = t * t
+    pts.push([a * p0[0] + b * pc[0] + c * p1[0], a * p0[1] + b * pc[1] + c * p1[1], t])
+  }
+  return pts
+}
+const LEFT_SPINE = hornSpine(LEFT_HORN)
+const RIGHT_SPINE = hornSpine(RIGHT_HORN)
+
+function inHorn(x, y, spine, width) {
+  for (const [sx, sy, t] of spine) {
+    const w = width * Math.pow(1 - t, 0.75) + 0.12
+    if (dist(x, y, sx, sy) <= w) return true
+  }
+  return false
+}
+
+function demon(x, y) {
+  const head = dist(x, y, HEAD.cx, HEAD.cy) <= HEAD.r
+  const horns = inHorn(x, y, LEFT_SPINE, LEFT_HORN.width) || inHorn(x, y, RIGHT_SPINE, RIGHT_HORN.width)
+  if (!(head || horns)) return false
+  const leftEye = inEllipse(x, y, 5.9, 8.6, 1.5, 0.8, 28)
+  const rightEye = inEllipse(x, y, 10.1, 8.6, 1.5, 0.8, -28)
+  const grin = dist(x, y, 8, 8.9) <= 4.3 && y >= 11.2
+  return !(leftEye || rightEye || grin)
+}
+
+const shapes = { demon }
+
+function render(shape, size, [r, g, b], alphaScale = 1) {
   const scale = size / 16
   const samples = 8
   const rgba = Buffer.alloc(size * size * 4)
@@ -101,7 +149,7 @@ function render(shape, size, [r, g, b]) {
           if (shape(x, y)) hits++
         }
       }
-      const alpha = Math.round((hits / (samples * samples)) * 255)
+      const alpha = Math.round((hits / (samples * samples)) * 255 * alphaScale)
       const i = (py * size + px) * 4
       rgba[i] = r
       rgba[i + 1] = g
@@ -115,17 +163,28 @@ function render(shape, size, [r, g, b]) {
 const BLACK = [0, 0, 0]
 const WHITE = [255, 255, 255]
 const RED = [255, 90, 90]
+const DIM = 0.5
 
 const files = [
-  ['idleTemplate', shapes.idle, BLACK],
-  ['runningTemplate', shapes.running, BLACK],
-  ['idle-light', shapes.idle, WHITE],
-  ['running-light', shapes.running, WHITE],
-  ['alert', shapes.alert, RED],
+  ['idleTemplate', shapes.demon, BLACK, DIM],
+  ['runningTemplate', shapes.demon, BLACK, 1],
+  ['idle-light', shapes.demon, WHITE, DIM],
+  ['running-light', shapes.demon, WHITE, 1],
+  ['alert', shapes.demon, RED, 1],
 ]
 
-for (const [name, shape, colour] of files) {
-  writeFileSync(join(outDir, `${name}.png`), render(shape, 16, colour))
-  writeFileSync(join(outDir, `${name}@2x.png`), render(shape, 32, colour))
+for (const [name, shape, colour, alpha] of files) {
+  writeFileSync(join(outDir, `${name}.png`), render(shape, 16, colour, alpha))
+  writeFileSync(join(outDir, `${name}@2x.png`), render(shape, 32, colour, alpha))
 }
 console.log(`wrote ${files.length * 2} icons to ${outDir}`)
+
+const previewFlag = process.argv.indexOf('--preview')
+if (previewFlag !== -1 && process.argv[previewFlag + 1]) {
+  const previewDir = process.argv[previewFlag + 1]
+  mkdirSync(previewDir, { recursive: true })
+  for (const [name, shape, colour, alpha] of files) {
+    writeFileSync(join(previewDir, `${name}-128.png`), render(shape, 128, colour, alpha))
+  }
+  console.log(`wrote previews to ${previewDir}`)
+}
