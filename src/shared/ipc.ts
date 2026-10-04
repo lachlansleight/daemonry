@@ -1,6 +1,6 @@
 // Renderer <-> main contract. The preload exposes DaemonryApi as window.daemonry.
 
-import type { AppConfig, AppId, Snapshot } from './types'
+import type { AppConfig, AppId, ShellEnvSummary, Snapshot } from './types'
 
 export type Route =
   | { page: 'home' }
@@ -22,6 +22,7 @@ export interface DaemonryApi {
   deleteApp(id: AppId): Promise<void>
   setLaunchAtLogin(value: boolean): Promise<void>
   setDefaultStopGrace(ms: number): Promise<void>
+  refreshShellEnv(): Promise<ShellEnvSummary>
 
   startApp(id: AppId): Promise<ActionResult>
   stopApp(id: AppId): Promise<ActionResult>
@@ -40,6 +41,7 @@ export const IPC = {
   deleteApp: 'config:deleteApp',
   setLaunchAtLogin: 'config:setLaunchAtLogin',
   setDefaultStopGrace: 'config:setDefaultStopGrace',
+  refreshShellEnv: 'shellEnv:refresh',
   startApp: 'app:start',
   stopApp: 'app:stop',
   restartApp: 'app:restart',

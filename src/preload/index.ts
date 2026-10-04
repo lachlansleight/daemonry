@@ -17,6 +17,7 @@ const api: DaemonryApi = {
   deleteApp: (id: AppId) => ipcRenderer.invoke(IPC.deleteApp, id),
   setLaunchAtLogin: (value) => ipcRenderer.invoke(IPC.setLaunchAtLogin, value),
   setDefaultStopGrace: (ms) => ipcRenderer.invoke(IPC.setDefaultStopGrace, ms),
+  refreshShellEnv: () => ipcRenderer.invoke(IPC.refreshShellEnv),
 
   startApp: (id) => ipcRenderer.invoke(IPC.startApp, id),
   stopApp: (id) => ipcRenderer.invoke(IPC.stopApp, id),

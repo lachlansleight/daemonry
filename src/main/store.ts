@@ -2,12 +2,14 @@
 
 import { EventEmitter } from 'node:events'
 import {
+  EMPTY_SHELL_ENV,
   emptyRuntime,
   type AppConfig,
   type AppId,
   type AppRuntime,
   type DaemonryConfig,
   type Paths,
+  type ShellEnvSummary,
   type Snapshot,
 } from '@shared/types'
 import { saveConfig } from './config'
@@ -15,6 +17,7 @@ import { log } from './log'
 
 export class Store extends EventEmitter {
   private runtime = new Map<AppId, AppRuntime>()
+  private shellEnv: ShellEnvSummary = EMPTY_SHELL_ENV
 
   constructor(
     private config: DaemonryConfig,
@@ -32,6 +35,7 @@ export class Store extends EventEmitter {
       runtime,
       paths: this.paths,
       platform: process.platform,
+      shellEnv: this.shellEnv,
     }
   }
 
@@ -76,6 +80,11 @@ export class Store extends EventEmitter {
   setDefaultStopGrace(ms: number): void {
     this.config.defaultStopGraceMs = ms
     this.persist()
+  }
+
+  setShellEnv(summary: ShellEnvSummary): void {
+    this.shellEnv = summary
+    this.emitChange()
   }
 
   /** Runtime changes are not persisted; they only broadcast. */

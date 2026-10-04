@@ -43,13 +43,22 @@ export function createMockApi(): DaemonryApi {
         statusText: '3 clients',
       },
       reachy01: emptyRuntime('reachy01'),
-      bridge01: { ...emptyRuntime('bridge01'), state: 'crashed', exitCode: 1 },
+      bridge01: { ...emptyRuntime('bridge01'), state: 'crashed', exitCode: 1, lastError: null },
     },
     paths: {
       configFile: '/Users/lachlan/Library/Application Support/daemonry/config.json',
       logsDir: '/Users/lachlan/Library/Logs/daemonry',
     },
     platform: 'darwin',
+    shellEnv: {
+      shell: '/bin/zsh',
+      ok: true,
+      error: null,
+      capturedAt: Date.now(),
+      nodePath: '/Users/lachlan/.nvm/versions/node/v23.11.0/bin/node',
+      pathEntries: ['/Users/lachlan/.nvm/versions/node/v23.11.0/bin', '/opt/homebrew/bin', '/usr/bin', '/bin'],
+      varCount: 142,
+    },
   }
 
   const listeners = new Set<(s: Snapshot) => void>()
@@ -81,9 +90,15 @@ export function createMockApi(): DaemonryApi {
     },
     setLaunchAtLogin: async (v) => ((snapshot.config.launchAtLogin = v), emit()),
     setDefaultStopGrace: async (ms) => ((snapshot.config.defaultStopGraceMs = ms), emit()),
+    refreshShellEnv: async () => {
+      snapshot.shellEnv = { ...snapshot.shellEnv, capturedAt: Date.now() }
+      emit()
+      return snapshot.shellEnv
+    },
 
     startApp: async (id) => {
-      patch(id, { state: 'launching', exitCode: null, exitSignal: null })
+      if (id === 'bridge01') return { ok: false, error: 'BRIDGE_TOKEN is not set (mock failure)' }
+      patch(id, { state: 'launching', exitCode: null, exitSignal: null, lastError: null })
       setTimeout(() => patch(id, { state: 'running', pid: 10000 + Math.floor(Math.random() * 50000), startedAt: Date.now() }), 1200)
       return ok
     },

@@ -5,10 +5,12 @@ the full design, data model, protocol and milestones.
 
 ## Status
 
-Milestone 1 (scaffold) is done: tooling, shared types, config store, window, tray with the
-full menu structure, and the renderer with every page and the app form. Start, stop,
-restart and commands are wired through to a supervisor that is not implemented yet; they
-log a warning and return an error until milestone 2.
+Milestones 1 and 2 are done. Apps can be configured, started, stopped and restarted from
+the tray or the GUI; they run in their own process group with the login shell's
+environment, autostart with daemonry, are killed as a tree after the grace period, and
+are all stopped on quit. Each app appends to a log file. Not yet: log rotation and the
+live log view (milestone 3), the socket protocol and commands (milestone 4), packaging
+and login item (milestone 5), Windows testing (milestone 6).
 
 ## Develop
 
@@ -23,6 +25,10 @@ or from the tray's "Open daemonry".
 
 Opening `http://localhost:5173` in a normal browser while `npm run dev` is running shows the
 renderer against an in-memory mock with three sample apps, useful for UI work without Electron.
+
+Dev switches: `DAEMONRY_USER_DATA=<dir>` runs against a separate profile,
+`DAEMONRY_INSPECT_PORT=9333` opens the Node inspector on the main process so
+`node scripts/dev-eval.mjs "<expr>"` can drive it, `DAEMONRY_KEEP_DOCK=1` keeps the dock icon.
 
 Other scripts:
 

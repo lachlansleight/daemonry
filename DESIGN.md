@@ -80,9 +80,12 @@ On macOS that is `~/Library/Application Support/daemonry/config.json`.
 
 ## Process lifecycle
 
-**Start.** Spawn `command` through the user's shell with `cwd` and the layered
-environment, in its own process group (`detached: true` on POSIX, `windowsHide: true`
-on Windows). State becomes `launching`.
+**Start.** Spawn `command` through the user's shell (`$SHELL -c` on POSIX, `cmd.exe` on
+Windows) with `cwd` and the layered environment, in its own process group
+(`detached: true` on POSIX, `windowsHide: true` on Windows). stdin is a pipe that is kept
+open but never written, because some tools such as nodemon misbehave on a closed stdin.
+State becomes `launching`. A start that fails before the process exists, for example a
+missing folder, is reported as `crashed` with the reason in `lastError`.
 
 **Launching to running.** The app becomes `running` when its client sends `hello`
 over the socket, or after three seconds alive if it never connects. If it exits
@@ -98,6 +101,10 @@ during that window with a non-zero code it is `crashed`.
 State is `stopping` throughout, then `inactive`. A stop requested by the user is never
 reported as a crash regardless of exit code.
 
+The end of a process is taken from the child's `close` event rather than `exit`. `close`
+waits for every holder of the stdio pipes, so a grandchild that outlives the shell or npm
+still counts as running until the group kill reaches it.
+
 **Unrequested exit.** Exit code 0 is `inactive`. Anything else, or death by signal, is
 `crashed`, with the code and signal kept for display. Starting the app again clears it.
 
@@ -110,9 +117,12 @@ and waits for it before exiting.
 A GUI app launched at login does not inherit the shell's PATH, and this machine loads
 nvm from `.zprofile`, so without this step `node` would not be found.
 
-At startup daemonry runs `$SHELL -ilc` once, prints the environment between markers,
-and parses it. That captured environment is cached for the session and shown in
-Settings with a refresh button. If the shell fails or times out, `process.env` is used.
+At startup daemonry runs `$SHELL -ilc` once, dumps the environment NUL-separated between
+markers, and parses it. Interactive and login both, so `.zprofile` (nvm here) and
+`.zshrc` (conda, pyenv) run. The variable `DAEMONRY_ENV_CAPTURE=1` is set during the
+capture so slow rc files can bail out early. `PWD`, `OLDPWD`, `SHLVL` and `_` are dropped.
+The captured environment is cached for the session and shown in Settings with a refresh
+button. If the shell fails or times out after twenty seconds, `process.env` is used.
 Windows uses `process.env` directly; the user PATH is already correct there.
 
 Environment layering, lowest to highest:
@@ -269,6 +279,17 @@ now, tested later; macOS first.
 - `npm run icons` — regenerate tray PNGs from `scripts/make-tray-icons.mjs`.
 - `npm run dist:mac` / `npm run dist:win` — electron-builder packages into `release/`.
 
+Dev-only environment switches, read by the main process:
+
+| Variable | Effect |
+| --- | --- |
+| `DAEMONRY_USER_DATA` | Separate profile dir for config, logs and the single-instance lock |
+| `DAEMONRY_INSPECT_PORT` | Opens the Node inspector and exposes `globalThis.__daemonry` for `scripts/dev-eval.mjs` |
+| `DAEMONRY_KEEP_DOCK` | Skips hiding the dock icon |
+
+`scripts/dev-eval.mjs "<expr>"` evaluates an expression in the running main process, which
+is how the supervisor is exercised end to end without clicking the tray.
+
 All packages are devDependencies: Vite bundles the renderer, and the main process has
 no runtime dependencies beyond Electron and Node built-ins.
 
@@ -277,8 +298,9 @@ no runtime dependencies beyond Electron and Node built-ins.
 1. **Scaffold.** Tooling, shared types, config store, window, tray with full menu
    structure, renderer shell with all pages and the app form. No processes yet.
 2. **Supervisor.** Shell env capture, spawn, state machine, stop sequence, tree kill,
-   crash detection, autostart, Stop All on quit, tray icon states.
-3. **Logs.** File capture with rotation, in-memory tail, live log view, View Logs.
+   crash detection, autostart, Stop All on quit, tray icon states. Also plain per-app
+   log files, because piped stdout has to be drained from day one or the child blocks.
+3. **Logs.** Rotation, in-memory tail, live log view in the GUI, View Logs.
 4. **Protocol.** Socket server per app, `client/daemonry-client.ts`, declared
    commands in the tray and GUI, status text, shutdown message.
 5. **Packaging.** Login item, electron-builder config, first `.app`, Gatekeeper notes.

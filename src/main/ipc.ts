@@ -4,11 +4,12 @@ import { IPC } from '@shared/ipc'
 import type { AppId } from '@shared/types'
 import { normaliseApp } from './config'
 import { log } from './log'
+import type { ShellEnv } from './shellEnv'
 import type { Store } from './store'
 import type { Supervisor } from './supervisor'
 import { getWindow } from './window'
 
-export function registerIpc(store: Store, supervisor: Supervisor): void {
+export function registerIpc(store: Store, supervisor: Supervisor, shellEnv: ShellEnv): void {
   ipcMain.handle(IPC.getSnapshot, () => store.snapshot())
 
   ipcMain.handle(IPC.saveApp, (_event, raw: unknown) => {
@@ -30,6 +31,12 @@ export function registerIpc(store: Store, supervisor: Supervisor): void {
   ipcMain.handle(IPC.setDefaultStopGrace, (_event, ms: number) => {
     if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0) throw new Error('invalid grace period')
     store.setDefaultStopGrace(Math.round(ms))
+  })
+
+  ipcMain.handle(IPC.refreshShellEnv, async () => {
+    const summary = await shellEnv.capture()
+    store.setShellEnv(summary)
+    return summary
   })
 
   ipcMain.handle(IPC.startApp, (_event, id: AppId) => supervisor.start(id))

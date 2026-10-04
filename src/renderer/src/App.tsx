@@ -3,6 +3,7 @@ import { AppPage } from './pages/AppPage'
 import { Home } from './pages/Home'
 import { NewApp } from './pages/NewApp'
 import { Settings } from './pages/Settings'
+import { Toasts } from './components/Toasts'
 import { useDaemonry } from './store'
 
 export function App(): React.JSX.Element {
@@ -33,6 +34,7 @@ export function App(): React.JSX.Element {
         <div className={`drag ${isMac ? 'h-[38px]' : 'h-[0px]'}`} />
         {page}
       </main>
+      <Toasts />
     </div>
   )
 }

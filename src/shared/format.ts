@@ -42,6 +42,7 @@ export function describeRuntime(rt: AppRuntime, now = Date.now()): string {
       parts.push('Crashed')
       if (rt.exitSignal) parts.push(rt.exitSignal)
       else if (rt.exitCode !== null) parts.push(`exit ${rt.exitCode}`)
+      if (rt.lastError) parts.push(rt.lastError)
       break
   }
   if (rt.statusText) parts.push(rt.statusText)

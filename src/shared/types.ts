@@ -48,6 +48,29 @@ export interface AppRuntime {
   commands: CommandDecl[]
   /** Optional one-line status reported by the app. */
   statusText: string | null
+  /** Why the last start failed or the app crashed, when daemonry knows. */
+  lastError: string | null
+}
+
+/** What daemonry learned from the user's login shell. */
+export interface ShellEnvSummary {
+  shell: string
+  ok: boolean
+  error: string | null
+  capturedAt: number | null
+  nodePath: string | null
+  pathEntries: string[]
+  varCount: number
+}
+
+export const EMPTY_SHELL_ENV: ShellEnvSummary = {
+  shell: '',
+  ok: false,
+  error: null,
+  capturedAt: null,
+  nodePath: null,
+  pathEntries: [],
+  varCount: 0,
 }
 
 export interface Paths {
@@ -61,6 +84,7 @@ export interface Snapshot {
   runtime: Record<AppId, AppRuntime>
   paths: Paths
   platform: Platform
+  shellEnv: ShellEnvSummary
 }
 
 export const DEFAULT_STOP_GRACE_MS = 10_000
@@ -83,6 +107,7 @@ export function emptyRuntime(id: AppId): AppRuntime {
     connected: false,
     commands: [],
     statusText: null,
+    lastError: null,
   }
 }
 

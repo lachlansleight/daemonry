@@ -5,7 +5,7 @@ import { api } from '../api'
 import { AppForm } from '../components/AppForm'
 import { StatusDot } from '../components/StatusDot'
 import { Button, Page, SectionLabel } from '../components/ui'
-import { useApp, useDaemonry, useNow } from '../store'
+import { useActions, useApp, useDaemonry, useNow } from '../store'
 
 function Stat({ label, value, mono = false }: { label: string; value: string; mono?: boolean }): React.JSX.Element {
   return (
@@ -19,6 +19,7 @@ function Stat({ label, value, mono = false }: { label: string; value: string; mo
 export function AppPage({ id, section }: { id: AppId; section?: 'status' | 'logs' | 'config' }): React.JSX.Element | null {
   const { snapshot, navigate } = useDaemonry()
   const { config, runtime } = useApp(id)
+  const actions = useActions()
   const now = useNow(isActive(runtime.state))
   const [confirmDelete, setConfirmDelete] = useState(false)
   const logsRef = useRef<HTMLDivElement>(null)
@@ -43,15 +44,15 @@ export function AppPage({ id, section }: { id: AppId; section?: 'status' | 'logs
       actions={
         <>
           {active ? (
-            <Button onClick={() => void api.stopApp(id)} disabled={runtime.state === 'stopping'}>
+            <Button onClick={() => actions.stop(id)} disabled={runtime.state === 'stopping'}>
               Stop
             </Button>
           ) : (
-            <Button variant="primary" onClick={() => void api.startApp(id)}>
+            <Button variant="primary" onClick={() => actions.start(id)}>
               Start
             </Button>
           )}
-          <Button onClick={() => void api.restartApp(id)} disabled={!running}>
+          <Button onClick={() => actions.restart(id)} disabled={!running}>
             Restart
           </Button>
           <Button variant="ghost" onClick={() => void api.revealInFolder(config.cwd)} disabled={!config.cwd}>
@@ -62,7 +63,7 @@ export function AppPage({ id, section }: { id: AppId; section?: 'status' | 'logs
     >
       <div className="flex items-center gap-[10px] mb-[24px] text-[13px]">
         <StatusDot state={runtime.state} size={10} />
-        <span className="text-ink-1">{describeRuntime(runtime, now)}</span>
+        <span className={runtime.state === 'crashed' ? 'text-bad' : 'text-ink-1'}>{describeRuntime(runtime, now)}</span>
       </div>
 
       {runtime.commands.length > 0 && (
@@ -70,7 +71,7 @@ export function AppPage({ id, section }: { id: AppId; section?: 'status' | 'logs
           <SectionLabel>Commands</SectionLabel>
           <div className="flex flex-wrap gap-[8px]">
             {runtime.commands.map((c) => (
-              <Button key={c.id} onClick={() => void api.sendCommand(id, c.id)} disabled={!running || !runtime.connected} title={c.id}>
+              <Button key={c.id} onClick={() => actions.sendCommand(id, c.id)} disabled={!running || !runtime.connected} title={c.id}>
                 {c.label ?? c.id}
               </Button>
             ))}

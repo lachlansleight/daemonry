@@ -1,12 +1,12 @@
 import { describeRuntime } from '@shared/format'
 import { isActive } from '@shared/types'
-import { api } from '../api'
 import { StatusDot } from '../components/StatusDot'
 import { Button, Page } from '../components/ui'
-import { useDaemonry, useNow } from '../store'
+import { useActions, useDaemonry, useNow } from '../store'
 
 export function Home(): React.JSX.Element {
   const { snapshot, navigate } = useDaemonry()
+  const actions = useActions()
   const apps = snapshot?.config.apps ?? []
   const anyActive = apps.some((a) => isActive(snapshot?.runtime[a.id]?.state ?? 'inactive'))
   const now = useNow(anyActive)
@@ -17,10 +17,16 @@ export function Home(): React.JSX.Element {
       actions={
         apps.length > 0 ? (
           <>
-            <Button onClick={() => apps.forEach((a) => void api.startApp(a.id))} disabled={apps.every((a) => isActive(snapshot?.runtime[a.id]?.state ?? 'inactive'))}>
+            <Button
+              onClick={() => actions.startAll(apps.filter((a) => !isActive(snapshot?.runtime[a.id]?.state ?? 'inactive')).map((a) => a.id))}
+              disabled={apps.every((a) => isActive(snapshot?.runtime[a.id]?.state ?? 'inactive'))}
+            >
               Start all
             </Button>
-            <Button onClick={() => apps.forEach((a) => void api.stopApp(a.id))} disabled={!anyActive}>
+            <Button
+              onClick={() => actions.stopAll(apps.filter((a) => isActive(snapshot?.runtime[a.id]?.state ?? 'inactive')).map((a) => a.id))}
+              disabled={!anyActive}
+            >
               Stop all
             </Button>
           </>
@@ -50,13 +56,13 @@ export function Home(): React.JSX.Element {
                 <span className="flex-1 text-[12px] text-ink-1 truncate">{describeRuntime(rt, now)}</span>
                 <div className="flex items-center gap-[6px]">
                   {active ? (
-                    <Button onClick={() => void api.stopApp(app.id)} disabled={rt.state === 'stopping'}>
+                    <Button onClick={() => actions.stop(app.id)} disabled={rt.state === 'stopping'}>
                       Stop
                     </Button>
                   ) : (
-                    <Button onClick={() => void api.startApp(app.id)}>Start</Button>
+                    <Button onClick={() => actions.start(app.id)}>Start</Button>
                   )}
-                  <Button variant="ghost" onClick={() => void api.restartApp(app.id)} disabled={rt.state !== 'running'}>
+                  <Button variant="ghost" onClick={() => actions.restart(app.id)} disabled={rt.state !== 'running'}>
                     Restart
                   </Button>
                 </div>
