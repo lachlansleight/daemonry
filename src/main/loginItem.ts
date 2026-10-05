@@ -3,14 +3,18 @@
 
 import { app, shell } from 'electron'
 import type { LoginItemState } from '@shared/types'
+import { LOGIN_LAUNCH_ARG } from './launchContext'
 import { log } from './log'
+
+/** Windows passes arguments to the login item; macOS (SMAppService) cannot. */
+const winArgs = process.platform === 'win32' ? { args: [LOGIN_LAUNCH_ARG] } : {}
 
 const UNSUPPORTED: LoginItemState = { openAtLogin: false, status: 'unsupported' }
 
 export function readLoginItem(): LoginItemState {
   if (!app.isPackaged) return UNSUPPORTED
   try {
-    const settings = app.getLoginItemSettings()
+    const settings = app.getLoginItemSettings(winArgs)
     if (process.platform === 'darwin') return { openAtLogin: settings.openAtLogin, status: settings.status }
     return { openAtLogin: settings.openAtLogin, status: settings.openAtLogin ? 'enabled' : 'not-registered' }
   } catch (err) {
@@ -25,7 +29,7 @@ export function applyLoginItem(openAtLogin: boolean): LoginItemState {
     return UNSUPPORTED
   }
   try {
-    app.setLoginItemSettings({ openAtLogin })
+    app.setLoginItemSettings({ openAtLogin, ...winArgs })
   } catch (err) {
     log.error('could not update login item settings', err)
   }

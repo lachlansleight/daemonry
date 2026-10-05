@@ -4,6 +4,7 @@ import type { Paths } from '@shared/types'
 import { LogStore, logFileFor } from './appLogs'
 import { loadConfig } from './config'
 import { registerIpc } from './ipc'
+import { launchedAtLogin } from './launchContext'
 import { initLog, log } from './log'
 import { readLoginItem } from './loginItem'
 import { installAppMenu } from './menu'
@@ -58,7 +59,7 @@ function main(): void {
 
   registerIpc({ store, supervisor, shellEnv, logStore, paths })
   tray.init()
-  openInspectorIfRequested({ store, supervisor, logStore, openWindow })
+  openInspectorIfRequested({ store, supervisor, logStore, openWindow, launchedAtLogin })
 
   // The OS is the truth for launch-at-login: the user may have changed it in System
   // Settings, or the app may have moved. Reflect it; the toggle in Settings changes it.
@@ -69,8 +70,11 @@ function main(): void {
     store.setLaunchAtLogin(loginItem.openAtLogin)
   }
 
-  // First run: no config yet, so show the GUI.
-  if (!existed) openWindow({ page: 'home' })
+  // Show the GUI when the user opened daemonry themselves. A login launch stays in the
+  // menu bar, unless there is no config yet to run anything with.
+  const atLogin = launchedAtLogin()
+  log.info(atLogin ? 'launched at login' : 'launched by the user')
+  if (!existed || !atLogin) openWindow({ page: 'home' })
 
   // Capture the login shell environment before anything is launched with it.
   void shellEnv

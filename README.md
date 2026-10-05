@@ -67,8 +67,8 @@ Other scripts:
 npm run install:mac
 ```
 
-Then open `/Applications/daemonry.app` once. Turn on "Launch daemonry at login" in
-Settings; macOS 13+ may ask you to approve it under System Settings > General > Login
+Then open `/Applications/daemonry.app`. Opening it yourself shows the window; a launch at
+login stays in the menu bar. Turn on "Launch daemonry at login" in Settings; macOS 13+ may ask you to approve it under System Settings > General > Login
 Items, and the Settings page shows an Open button while that is pending.
 
 Notes:
@@ -85,10 +85,23 @@ Notes:
 
 ## App icon
 
-Put a 1024x1024 PNG at `build/icon.png` (1024 so the 512@2x Retina slot is sharp; 512
-works but renders soft). electron-builder converts it to `.icns` and `.ico` at build
-time. For macOS, draw the rounded square yourself on a transparent canvas (Apple's grid:
-an 824px square centred in 1024, corner radius about 185) and leave the margin empty.
+Recent macOS draws every app icon inside its rounded "glass" square. An icon that is
+just a glyph on a transparent background gets shrunk into a default square, which is
+what a plain Figma export looks like. Two ways to control the background and glyph:
+
+**Icon Composer (best on macOS 26+).** It ships inside Xcode:
+`/Applications/Xcode.app/Contents/Applications/Icon Composer.app`. Make a new macOS
+icon, set the background fill (solid or gradient), add the glyph as an SVG or PNG layer,
+and save the document as `build/daemonry.icon`. The build picks it up automatically
+(`mac.icon` in `electron-builder.cjs`, rendered with Xcode's `actool`) and the system
+then handles light, dark, clear and tinted variants itself. A legacy `.icns` is
+generated from it too for older macOS.
+
+**Plain PNG.** Put a 1024x1024 PNG at `build/icon.png` and draw the full rounded square
+yourself: background colour filling Apple's shape (an 824px square centred in 1024,
+corner radius about 185), glyph on top, margin transparent. electron-builder converts
+it to `.icns` and `.ico`. This is also the Windows source either way, since Windows
+ignores the Icon Composer document.
 
 After reinstalling with a new icon, Finder and the Dock may keep showing the old one
 from their cache. `npm run install:mac` touches the bundle and re-registers it, which

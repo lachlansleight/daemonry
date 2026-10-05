@@ -276,6 +276,12 @@ opens the GUI straight to that app's log section.
 
 ## Platform notes
 
+**Launch.** Opened by the user, daemonry shows the window; launched at login it only
+shows the tray. Windows login items carry `--launched-at-login`. macOS login items get
+no arguments, so a launch within two minutes of the console login (the mtime of
+`/dev/console`) counts as a login launch, with Electron's `wasOpenedAtLogin` as an extra
+signal. A first run with no config always shows the window.
+
 **macOS.** Starts as a menu bar app with no dock icon (`LSUIElement`); the dock icon is
 shown while the GUI window is open and hidden again when it closes, so the window can be
 reached from the Dock and Cmd+Tab. An application menu provides Cmd+W (hide the window),
