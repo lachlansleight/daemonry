@@ -86,6 +86,14 @@ export interface LogLine {
 
 export const LOG_TAIL_LINES = 2000
 
+/** macOS reports a status for SMAppService login items; other platforms only know on/off. */
+export type LoginItemStatus = 'not-registered' | 'enabled' | 'requires-approval' | 'not-found' | 'unsupported'
+
+export interface LoginItemState {
+  openAtLogin: boolean
+  status: LoginItemStatus
+}
+
 export interface Paths {
   configFile: string
   logsDir: string
@@ -97,7 +105,10 @@ export interface Snapshot {
   runtime: Record<AppId, AppRuntime>
   paths: Paths
   platform: Platform
+  /** False when running from source via electron-vite dev. */
+  packaged: boolean
   shellEnv: ShellEnvSummary
+  loginItem: LoginItemState
 }
 
 export const DEFAULT_STOP_GRACE_MS = 10_000

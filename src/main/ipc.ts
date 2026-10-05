@@ -4,7 +4,7 @@ import { IPC } from '@shared/ipc'
 import type { AppId, LogLine, Paths } from '@shared/types'
 import { deleteLogFiles, type LogStore } from './appLogs'
 import { normaliseApp } from './config'
-import { log } from './log'
+import { applyLoginItem, openLoginItemsSettings } from './loginItem'
 import type { ShellEnv } from './shellEnv'
 import type { Store } from './store'
 import type { Supervisor } from './supervisor'
@@ -39,8 +39,10 @@ export function registerIpc({ store, supervisor, shellEnv, logStore, paths }: Ip
 
   ipcMain.handle(IPC.setLaunchAtLogin, (_event, value: boolean) => {
     store.setLaunchAtLogin(value === true)
-    applyLoginItem(value === true)
+    store.setLoginItemState(applyLoginItem(value === true))
   })
+
+  ipcMain.handle(IPC.openLoginItemsSettings, () => openLoginItemsSettings())
 
   ipcMain.handle(IPC.setDefaultStopGrace, (_event, ms: number) => {
     if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0) throw new Error('invalid grace period')
@@ -100,13 +102,4 @@ export function registerIpc({ store, supervisor, shellEnv, logStore, paths }: Ip
     else pending.set(id, [...lines])
     if (!flushTimer) flushTimer = setTimeout(flush, LOG_FLUSH_MS)
   })
-}
-
-/** Login item registration only works from a packaged build. */
-export function applyLoginItem(openAtLogin: boolean): void {
-  if (!app.isPackaged) {
-    log.info(`launch at login set to ${openAtLogin}; not applied to the OS from a dev build`)
-    return
-  }
-  app.setLoginItemSettings({ openAtLogin })
 }

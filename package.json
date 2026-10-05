@@ -13,9 +13,10 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.client.json",
     "icons": "node scripts/make-tray-icons.mjs",
-    "package": "electron-vite build && electron-builder --dir",
+    "package": "electron-vite build && electron-builder --mac --dir",
     "dist:mac": "electron-vite build && electron-builder --mac",
-    "dist:win": "electron-vite build && electron-builder --win"
+    "dist:win": "electron-vite build && electron-builder --win",
+    "install:mac": "npm run package && node scripts/install-mac.mjs"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

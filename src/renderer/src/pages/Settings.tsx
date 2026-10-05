@@ -37,6 +37,20 @@ export function Settings(): React.JSX.Element {
     <Page title="Settings">
       <div className="rounded-[8px] border border-line px-[16px]">
         <Row label="Launch daemonry at login">
+          {!snapshot.packaged ? (
+            <span className="text-[12px] text-ink-2">dev build, not applied</span>
+          ) : config.launchAtLogin && snapshot.loginItem.status === 'requires-approval' ? (
+            <>
+              <span className="text-[12px] text-warn">needs approval in System Settings</span>
+              <Button variant="ghost" onClick={() => void api.openLoginItemsSettings()}>
+                Open
+              </Button>
+            </>
+          ) : config.launchAtLogin && snapshot.loginItem.status === 'not-found' ? (
+            <span className="text-[12px] text-bad" title="macOS lost track of the app, usually after it moved. Toggle off and on.">
+              app not found by the OS
+            </span>
+          ) : null}
           <Toggle checked={config.launchAtLogin} onChange={(v) => void api.setLaunchAtLogin(v)} />
         </Row>
         <Row label="Default stop grace">

@@ -5,13 +5,13 @@ the full design, data model, protocol and milestones.
 
 ## Status
 
-Milestones 1 to 4 are done. Apps can be configured, started, stopped and restarted from
+Milestones 1 to 5 are done. Apps can be configured, started, stopped and restarted from
 the tray or the GUI; they run in their own process group with the login shell's
 environment, autostart with daemonry, are killed as a tree after the grace period, and
 are all stopped on quit. Output goes to rotated log files and a live log view in the
 GUI. Apps that include the client declare commands that appear in the tray and GUI,
-report a status line, and get a graceful shutdown message. Not yet: packaging and login
-item (milestone 5), Windows testing (milestone 6).
+report a status line, and get a graceful shutdown message. It packages into a `.app` that can launch at login. Not yet: Windows testing
+(milestone 6).
 
 ## Integrating an app
 
@@ -56,9 +56,40 @@ Other scripts:
 | `npm run typecheck` | Type-checks main, preload and renderer |
 | `npm run build` | Bundles everything into `out/` |
 | `npm run icons` | Regenerates the tray PNGs in `resources/tray` |
-| `npm run package` | Unpacked app in `release/` for a local test |
+| `npm run package` | Unpacked `daemonry.app` in `release/mac-arm64/` |
+| `npm run install:mac` | Packages, quits any running copy, and copies the app into `/Applications` |
 | `npm run dist:mac` | DMG and zip in `release/` |
 | `npm run dist:win` | NSIS installer, to be run on Windows |
+
+## Install on macOS
+
+```bash
+npm run install:mac
+```
+
+Then open `/Applications/daemonry.app` once. Turn on "Launch daemonry at login" in
+Settings; macOS 13+ may ask you to approve it under System Settings > General > Login
+Items, and the Settings page shows an Open button while that is pending.
+
+Notes:
+
+- The build is unsigned apart from an ad-hoc signature, so it runs locally without
+  Gatekeeper involvement. A copy that arrives through a download or AirDrop gets
+  quarantined and macOS will call it damaged; clear that with
+  `xattr -dr com.apple.quarantine /Applications/daemonry.app`.
+- Keep the app in `/Applications`. The login item points at that path, and moving the
+  bundle makes macOS report it as not found until the toggle is switched off and on.
+- The installed app and `npm run dev` share the same config and single-instance lock,
+  so quit the installed copy before developing, or give the dev run its own profile
+  with `DAEMONRY_USER_DATA=/tmp/daemonry-dev npm run dev`.
+
+## App icon
+
+Put a 1024x1024 PNG at `build/icon.png`. electron-builder converts it to `.icns` and
+`.ico` at build time. For macOS, draw the rounded square yourself on a transparent
+canvas (Apple's grid: an 824px square centred in 1024, corner radius about 185) and
+leave the margin empty. The file there now is a generated placeholder; replace it and
+rebuild.
 
 ## Paths
 

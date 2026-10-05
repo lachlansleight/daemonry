@@ -3,8 +3,9 @@ import { join } from 'node:path'
 import type { Paths } from '@shared/types'
 import { LogStore, logFileFor } from './appLogs'
 import { loadConfig } from './config'
-import { applyLoginItem, registerIpc } from './ipc'
+import { registerIpc } from './ipc'
 import { initLog, log } from './log'
+import { readLoginItem } from './loginItem'
 import { ShellEnv } from './shellEnv'
 import { Store } from './store'
 import { Supervisor } from './supervisor'
@@ -14,7 +15,7 @@ import { markQuitting, openWindow } from './window'
 // Dev affordances, all opt-in through the environment:
 //   DAEMONRY_USER_DATA    separate profile (config, logs, single-instance lock)
 //   DAEMONRY_INSPECT_PORT open the Node inspector on the main process and expose
-//                         globalThis.__daemonry = { app, store, supervisor, logStore } for scripts/dev-eval.mjs
+//                         globalThis.__daemonry = { app, electron, store, supervisor, logStore } for scripts/dev-eval.mjs
 //   DAEMONRY_LOG_MAX_BYTES rotate app logs at this size instead of 5 MB
 //   DAEMONRY_KEEP_DOCK    skip hiding the dock icon
 const userDataOverride = process.env['DAEMONRY_USER_DATA']
@@ -42,7 +43,7 @@ function main(): void {
   log.info(`daemonry ${app.getVersion()} starting`, { packaged: app.isPackaged, config: paths.configFile })
 
   const { config, existed } = loadConfig(paths.configFile)
-  const store = new Store(config, paths)
+  const store = new Store(config, paths, app.isPackaged)
   const shellEnv = new ShellEnv()
   const logStore = new LogStore()
   for (const appConfig of config.apps) logStore.primeFromFile(appConfig.id, logFileFor(paths.logsDir, appConfig.id))
@@ -51,8 +52,16 @@ function main(): void {
 
   registerIpc({ store, supervisor, shellEnv, logStore, paths })
   tray.init()
-  if (config.launchAtLogin) applyLoginItem(true)
   openInspectorIfRequested({ store, supervisor, logStore })
+
+  // The OS is the truth for launch-at-login: the user may have changed it in System
+  // Settings, or the app may have moved. Reflect it; the toggle in Settings changes it.
+  const loginItem = readLoginItem()
+  store.setLoginItemState(loginItem)
+  if (app.isPackaged && loginItem.openAtLogin !== config.launchAtLogin) {
+    log.info(`launch at login is ${loginItem.openAtLogin} in the OS; updating config to match`)
+    store.setLaunchAtLogin(loginItem.openAtLogin)
+  }
 
   // First run: no config yet, so show the GUI.
   if (!existed) openWindow({ page: 'home' })
@@ -90,11 +99,12 @@ function main(): void {
 
 function openInspectorIfRequested(handles: Record<string, unknown>): void {
   const port = Number(process.env['DAEMONRY_INSPECT_PORT'])
-  if (!port || app.isPackaged) return
+  if (!port) return
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const inspector = require('node:inspector') as typeof import('node:inspector')
   inspector.open(port, '127.0.0.1')
-  ;(globalThis as Record<string, unknown>)['__daemonry'] = { app, ...handles }
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  ;(globalThis as Record<string, unknown>)['__daemonry'] = { app, electron: require('electron'), ...handles }
   log.info(`inspector open on 127.0.0.1:${port}; globalThis.__daemonry exposed`)
 }
 

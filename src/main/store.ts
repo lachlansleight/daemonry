@@ -8,6 +8,7 @@ import {
   type AppId,
   type AppRuntime,
   type DaemonryConfig,
+  type LoginItemState,
   type Paths,
   type ShellEnvSummary,
   type Snapshot,
@@ -18,10 +19,12 @@ import { log } from './log'
 export class Store extends EventEmitter {
   private runtime = new Map<AppId, AppRuntime>()
   private shellEnv: ShellEnvSummary = EMPTY_SHELL_ENV
+  private loginItem: LoginItemState = { openAtLogin: false, status: 'unsupported' }
 
   constructor(
     private config: DaemonryConfig,
     private readonly paths: Paths,
+    private readonly packaged: boolean,
   ) {
     super()
     for (const app of config.apps) this.runtime.set(app.id, emptyRuntime(app.id))
@@ -35,7 +38,9 @@ export class Store extends EventEmitter {
       runtime,
       paths: this.paths,
       platform: process.platform,
+      packaged: this.packaged,
       shellEnv: this.shellEnv,
+      loginItem: this.loginItem,
     }
   }
 
@@ -80,6 +85,11 @@ export class Store extends EventEmitter {
   setDefaultStopGrace(ms: number): void {
     this.config.defaultStopGraceMs = ms
     this.persist()
+  }
+
+  setLoginItemState(state: LoginItemState): void {
+    this.loginItem = state
+    this.emitChange()
   }
 
   setShellEnv(summary: ShellEnvSummary): void {

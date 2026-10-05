@@ -9,6 +9,9 @@
 //
 //   node scripts/make-tray-icons.mjs                 write the tray icons
 //   node scripts/make-tray-icons.mjs --preview DIR   also write 128px previews to DIR
+//   node scripts/make-tray-icons.mjs --app-icon      also write a placeholder build/icon.png
+//                                                    (1024px, macOS rounded square); replace
+//                                                    it with the real app icon from Figma
 
 import { deflateSync } from 'node:zlib'
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -187,4 +190,68 @@ if (previewFlag !== -1 && process.argv[previewFlag + 1]) {
     writeFileSync(join(previewDir, `${name}-128.png`), render(shape, 128, colour, alpha))
   }
   console.log(`wrote previews to ${previewDir}`)
+}
+
+// --- Placeholder app icon ----------------------------------------------------
+// macOS Big Sur grid: 1024 canvas, rounded square of 824 centred, corner radius ~185.
+// Dark square with the demon glyph, so the first build has something recognisable.
+
+function renderAppIcon(size) {
+  const samples = 3
+  const square = size * (824 / 1024)
+  const radius = square * 0.2248
+  const inset = (size - square) / 2
+  const glyphBox = square * 0.62
+  const glyphOrigin = (size - glyphBox) / 2
+  const bg = [27, 27, 30]
+  const fg = [244, 244, 245]
+
+  const inRoundedSquare = (x, y) => {
+    const lx = x - inset
+    const ly = y - inset
+    if (lx < 0 || ly < 0 || lx > square || ly > square) return false
+    const cx = Math.min(Math.max(lx, radius), square - radius)
+    const cy = Math.min(Math.max(ly, radius), square - radius)
+    return Math.hypot(lx - cx, ly - cy) <= radius
+  }
+  const inGlyph = (x, y) => {
+    const gx = ((x - glyphOrigin) / glyphBox) * 16
+    const gy = ((y - glyphOrigin) / glyphBox) * 16
+    return gx >= 0 && gy >= 0 && gx < 16 && gy < 16 && shapes.demon(gx, gy)
+  }
+
+  const rgba = Buffer.alloc(size * size * 4)
+  for (let py = 0; py < size; py++) {
+    for (let px = 0; px < size; px++) {
+      let bgHits = 0
+      let fgHits = 0
+      for (let sy = 0; sy < samples; sy++) {
+        for (let sx = 0; sx < samples; sx++) {
+          const x = px + (sx + 0.5) / samples
+          const y = py + (sy + 0.5) / samples
+          if (inRoundedSquare(x, y)) {
+            bgHits++
+            if (inGlyph(x, y)) fgHits++
+          }
+        }
+      }
+      const total = samples * samples
+      const alpha = bgHits / total
+      const mix = bgHits === 0 ? 0 : fgHits / bgHits
+      const i = (py * size + px) * 4
+      rgba[i] = Math.round(bg[0] + (fg[0] - bg[0]) * mix)
+      rgba[i + 1] = Math.round(bg[1] + (fg[1] - bg[1]) * mix)
+      rgba[i + 2] = Math.round(bg[2] + (fg[2] - bg[2]) * mix)
+      rgba[i + 3] = Math.round(alpha * 255)
+    }
+  }
+  return encodePng(size, size, rgba)
+}
+
+if (process.argv.includes('--app-icon')) {
+  const buildDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'build')
+  mkdirSync(buildDir, { recursive: true })
+  const target = join(buildDir, 'icon.png')
+  writeFileSync(target, renderAppIcon(1024))
+  console.log(`wrote placeholder app icon to ${target}`)
 }

@@ -50,6 +50,8 @@ export function createMockApi(): DaemonryApi {
       logsDir: '/Users/lachlan/Library/Logs/daemonry',
     },
     platform: 'darwin',
+    packaged: true,
+    loginItem: { openAtLogin: true, status: 'requires-approval' },
     shellEnv: {
       shell: '/bin/zsh',
       ok: true,
@@ -109,7 +111,12 @@ export function createMockApi(): DaemonryApi {
       delete snapshot.runtime[id]
       emit()
     },
-    setLaunchAtLogin: async (v) => ((snapshot.config.launchAtLogin = v), emit()),
+    setLaunchAtLogin: async (v) => {
+      snapshot.config.launchAtLogin = v
+      snapshot.loginItem = { openAtLogin: v, status: v ? 'requires-approval' : 'not-registered' }
+      emit()
+    },
+    openLoginItemsSettings: async () => undefined,
     setDefaultStopGrace: async (ms) => ((snapshot.config.defaultStopGraceMs = ms), emit()),
     refreshShellEnv: async () => {
       snapshot.shellEnv = { ...snapshot.shellEnv, capturedAt: Date.now() }

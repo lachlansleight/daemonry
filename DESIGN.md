@@ -276,9 +276,13 @@ opens the GUI straight to that app's log section.
 
 ## Platform notes
 
-**macOS.** Dock icon hidden (`LSUIElement`). Login item via
-`app.setLoginItemSettings`, only when packaged; it does nothing from a dev build.
-Unsigned builds show a one-time Gatekeeper warning. Process group kill via negative pid.
+**macOS.** Dock icon hidden (`LSUIElement`). Login item via `app.setLoginItemSettings`
+(SMAppService on macOS 13+), only when packaged; from a dev build it is reported as not
+applied. At startup the OS state is read back and the config updated to match, since the
+user can change it in System Settings; the Settings page shows "requires approval" with
+a shortcut when macOS wants the user to confirm. Builds are ad-hoc signed by an afterPack
+hook, which is enough to run locally; a quarantined copy needs `xattr -dr
+com.apple.quarantine`. Process group kill via negative pid.
 
 **Windows.** Named pipes, `taskkill /T /F`, `windowsHide`. No SIGTERM, so graceful
 stop relies entirely on the socket `shutdown` message. Login item via the registry
@@ -319,5 +323,6 @@ no runtime dependencies beyond Electron and Node built-ins.
 3. **Logs.** Rotation, in-memory tail, live log view in the GUI, View Logs.
 4. **Protocol.** Socket server per app, `client/daemonry-client.ts`, declared
    commands in the tray and GUI, status text, shutdown message, `examples/hello-app`.
-5. **Packaging.** Login item, electron-builder config, first `.app`, Gatekeeper notes.
+5. **Packaging.** Login item with OS status readback, electron-builder config with
+   ad-hoc signing, `build/icon.png` placeholder, `npm run install:mac`, Gatekeeper notes.
 6. **Windows.** Pipes, taskkill, Explorer label, NSIS installer. Test on a Windows machine.

@@ -21,6 +21,7 @@ export interface DaemonryApi {
   saveApp(app: AppConfig): Promise<void>
   deleteApp(id: AppId): Promise<void>
   setLaunchAtLogin(value: boolean): Promise<void>
+  openLoginItemsSettings(): Promise<void>
   setDefaultStopGrace(ms: number): Promise<void>
   refreshShellEnv(): Promise<ShellEnvSummary>
 
@@ -44,6 +45,7 @@ export const IPC = {
   saveApp: 'config:saveApp',
   deleteApp: 'config:deleteApp',
   setLaunchAtLogin: 'config:setLaunchAtLogin',
+  openLoginItemsSettings: 'shell:openLoginItemsSettings',
   setDefaultStopGrace: 'config:setDefaultStopGrace',
   refreshShellEnv: 'shellEnv:refresh',
   startApp: 'app:start',
