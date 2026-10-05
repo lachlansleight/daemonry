@@ -276,7 +276,10 @@ opens the GUI straight to that app's log section.
 
 ## Platform notes
 
-**macOS.** Dock icon hidden (`LSUIElement`). Login item via `app.setLoginItemSettings`
+**macOS.** Starts as a menu bar app with no dock icon (`LSUIElement`); the dock icon is
+shown while the GUI window is open and hidden again when it closes, so the window can be
+reached from the Dock and Cmd+Tab. An application menu provides Cmd+W (hide the window),
+Cmd+Q (quit daemonry, stopping every app) and the Edit shortcuts. Login item via `app.setLoginItemSettings`
 (SMAppService on macOS 13+), only when packaged; from a dev build it is reported as not
 applied. At startup the OS state is read back and the config updated to match, since the
 user can change it in System Settings; the Settings page shows "requires approval" with

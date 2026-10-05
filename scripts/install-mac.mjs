@@ -26,5 +26,15 @@ for (let i = 0; i < 30; i++) {
 
 if (existsSync(target)) rmSync(target, { recursive: true, force: true })
 execSync(`ditto "${built}" "${target}"`)
+
+// Finder and the Dock cache icons by bundle; nudge LaunchServices so a new icon shows.
+execSync(`touch "${target}"`)
+spawnSync(
+  '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister',
+  ['-f', target],
+  { stdio: 'ignore' },
+)
+
 console.log(`installed ${target}`)
 console.log('open it with:  open /Applications/daemonry.app')
+console.log('if Finder still shows the old icon:  killall Dock')

@@ -6,18 +6,19 @@ import { loadConfig } from './config'
 import { registerIpc } from './ipc'
 import { initLog, log } from './log'
 import { readLoginItem } from './loginItem'
+import { installAppMenu } from './menu'
 import { ShellEnv } from './shellEnv'
 import { Store } from './store'
 import { Supervisor } from './supervisor'
 import { TrayController } from './tray'
-import { markQuitting, openWindow } from './window'
+import { applyDevDockIcon, markQuitting, openWindow } from './window'
 
 // Dev affordances, all opt-in through the environment:
 //   DAEMONRY_USER_DATA    separate profile (config, logs, single-instance lock)
 //   DAEMONRY_INSPECT_PORT open the Node inspector on the main process and expose
 //                         globalThis.__daemonry = { app, electron, store, supervisor, logStore } for scripts/dev-eval.mjs
 //   DAEMONRY_LOG_MAX_BYTES rotate app logs at this size instead of 5 MB
-//   DAEMONRY_KEEP_DOCK    skip hiding the dock icon
+//   DAEMONRY_KEEP_DOCK    keep the dock icon visible permanently
 const userDataOverride = process.env['DAEMONRY_USER_DATA']
 if (userDataOverride) {
   app.setPath('userData', userDataOverride)
@@ -29,11 +30,16 @@ if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   app.on('second-instance', () => openWindow())
+  // Clicking the dock icon (visible while the window exists) brings the window back.
+  app.on('activate', () => openWindow())
   void app.whenReady().then(main)
 }
 
 function main(): void {
+  // Menu bar app: no dock icon until the window opens (see window.ts).
   if (process.platform === 'darwin' && !process.env['DAEMONRY_KEEP_DOCK']) app.dock?.hide()
+  applyDevDockIcon()
+  installAppMenu()
 
   const paths: Paths = {
     configFile: join(app.getPath('userData'), 'config.json'),
@@ -52,7 +58,7 @@ function main(): void {
 
   registerIpc({ store, supervisor, shellEnv, logStore, paths })
   tray.init()
-  openInspectorIfRequested({ store, supervisor, logStore })
+  openInspectorIfRequested({ store, supervisor, logStore, openWindow })
 
   // The OS is the truth for launch-at-login: the user may have changed it in System
   // Settings, or the app may have moved. Reflect it; the toggle in Settings changes it.

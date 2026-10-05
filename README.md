@@ -85,11 +85,17 @@ Notes:
 
 ## App icon
 
-Put a 1024x1024 PNG at `build/icon.png`. electron-builder converts it to `.icns` and
-`.ico` at build time. For macOS, draw the rounded square yourself on a transparent
-canvas (Apple's grid: an 824px square centred in 1024, corner radius about 185) and
-leave the margin empty. The file there now is a generated placeholder; replace it and
-rebuild.
+Put a 1024x1024 PNG at `build/icon.png` (1024 so the 512@2x Retina slot is sharp; 512
+works but renders soft). electron-builder converts it to `.icns` and `.ico` at build
+time. For macOS, draw the rounded square yourself on a transparent canvas (Apple's grid:
+an 824px square centred in 1024, corner radius about 185) and leave the margin empty.
+
+After reinstalling with a new icon, Finder and the Dock may keep showing the old one
+from their cache. `npm run install:mac` touches the bundle and re-registers it, which
+usually suffices; otherwise `killall Dock`.
+
+The dock icon appears only while the daemonry window is open; with the window closed
+daemonry is a pure menu bar app.
 
 ## Paths
 
